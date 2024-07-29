@@ -4,6 +4,8 @@
  */
 package ru.java_inside.lift_ui.lift;
 
+import lombok.Getter;
+
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.Set;
@@ -13,6 +15,7 @@ import java.util.Set;
  *
  * @author 6PATyCb
  */
+@Getter
 public enum LiftActionsGraph {
     /**
      * Пустой лифт ничего не делает
@@ -35,32 +38,24 @@ public enum LiftActionsGraph {
      */
     ON_BROKEN(LiftAction.BROKEN, PassengerAction.REPAIR);
 
-    private final LiftAction currenAction;
+    private final LiftAction currentAction;
     private final PassengerAction[] availableActions;
 
-    private LiftActionsGraph(LiftAction currenAction, PassengerAction... availableActions) {
-        this.currenAction = currenAction;
+    private LiftActionsGraph(LiftAction currentAction, PassengerAction... availableActions) {
+        this.currentAction = currentAction;
         this.availableActions = availableActions;
     }
 
-    public PassengerAction[] getAvailableActions() {
-        return availableActions;
-    }
-
-    public LiftAction getCurrenAction() {
-        return currenAction;
-    }
-
     /**
-     * Получение доступный действий относительно текущего действия
+     * Получение доступных действий относительно текущего действия
      *
-     * @param currenAction
+     * @param currentAction
      * @return
      */
-    public static Set<PassengerAction> getAvailableActions(LiftAction currenAction) {
+    public static Set<PassengerAction> getAvailableActions(LiftAction currentAction) {
         Set<PassengerAction> availableActions = new HashSet<>();
         for (LiftActionsGraph graphValue : values()) {
-            if (currenAction == graphValue.getCurrenAction()) {
+            if (currentAction == graphValue.getCurrentAction()) {
                 availableActions.addAll(Arrays.asList(graphValue.getAvailableActions()));
                 break;
             }

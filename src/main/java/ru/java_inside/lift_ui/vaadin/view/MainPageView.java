@@ -73,7 +73,7 @@ public final class MainPageView extends VerticalLayout {
 
         pollerRegistration = UI.getCurrent().addPollListener(e -> {
             LiftState liftState = liftService.getLiftState();
-            updateButtonsAvailibility(liftState);
+            updateButtonsAvailability(liftState);
             updateLiftMovementProgressBar(liftState);
         });
 
@@ -166,7 +166,7 @@ public final class MainPageView extends VerticalLayout {
         Registration windowPollerRegistration = UI.getCurrent().addPollListener(e -> {
             LiftState liftState = liftService.getLiftState();
             liftStateSpan.setText(liftState.lastStateMessage);
-            updateButtonsAvailibility(liftState);
+            updateButtonsAvailability(liftState);
         });
 
         VerticalLayout layoutV = new VerticalLayout();
@@ -197,7 +197,7 @@ public final class MainPageView extends VerticalLayout {
      *
      * @param currentAction
      */
-    private void updateButtonsAvailibility(LiftState liftState) {
+    private void updateButtonsAvailability(LiftState liftState) {
         LiftAction currentAction = liftState.action;
         User currentUser = userService.getCurrentUser();
         byte userFloor = userfloorIntegerField.getValue().byteValue();
