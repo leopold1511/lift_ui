@@ -5,6 +5,7 @@
 package ru.java_inside.lift_ui.lift;
 
 import java.time.Clock;
+import java.time.Duration;
 import java.time.LocalDateTime;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -72,6 +73,18 @@ public class LiftEngine {
      * Текущее действие лифта
      */
     private LiftAction currentAction = LiftAction.NO_ACTION_WHEN_EMPTY;
+    /**
+     * Открыта ли дверь
+     */
+    private boolean isOpen = false;
+    /**
+     * Время до автоматического закрытия двери
+     */
+    private long doorTimeOut = 7;
+    /*
+     * Время последнего открытия двери
+     */
+    private LocalDateTime doorOpeningTime;
 
     /**
      * Вычисляет следующее состояние лифта
@@ -90,6 +103,7 @@ public class LiftEngine {
             if (currentFloor == waitFloor) {
                 if (passenger != null) {
                     if (passenger.getToFloor() != null && waitFloor == passenger.getToFloor()) {
+                        if(!isOpen) openDoor();
                         currentAction = LiftAction.NO_ACTION_WITH_PASSANGER;
                         int ridedFloors = passenger.getRidedFloors();
                         lastStateMessage = String.format("Пассажир %s вышел из лифта на %d этаже, проехав %d этажей", passenger.getUser(), currentFloor, ridedFloors);
@@ -102,6 +116,7 @@ public class LiftEngine {
                     if (passenger.isTimeToLeave(maxPassengerTimeout, LocalDateTime.now(clock))) {
                         currentAction = LiftAction.NO_ACTION_WITH_PASSANGER;
                         lastStateMessage = String.format("Пассажир %s вышел из лифта из-за неактивности на %d этаже", passenger.getUser(), currentFloor);
+                        openDoor();
                         passenger = null;
                         log.info(lastStateMessage);
                         return;
@@ -110,7 +125,12 @@ public class LiftEngine {
                 }
                 lastHoldFloor = currentFloor;
                 currentAction = passenger != null ? LiftAction.NO_ACTION_WITH_PASSANGER : LiftAction.NO_ACTION_WHEN_EMPTY;
-                lastStateMessage = String.format("%s ничего не делает на %d этаже", getLiftTextPrefix(), currentFloor);
+                if (doorOpeningTime != null && Duration.between(doorOpeningTime, LocalDateTime.now(clock)).toSeconds() >= doorTimeOut) {
+                    closeDoor();
+                    doorOpeningTime = null;
+                }
+                String doorState = isOpen ? "Открытый" : "Закрытый";
+                lastStateMessage = String.format("%s %s ничего не делает на %d этаже", doorState, getLiftTextPrefix(), currentFloor);
                 log.info(lastStateMessage);
                 return;
             }
@@ -127,19 +147,20 @@ public class LiftEngine {
                 currentAction = passenger != null ? LiftAction.MOVE_TO_FLOOR_WITH_PASSANGER : LiftAction.MOVE_TO_FLOOR_WHEN_EMPTY;
                 lastStateMessage = String.format("%s переместился вверх на %d этаж", getLiftTextPrefix(), currentFloor);
                 log.info(lastStateMessage);
-            } else {//движение вниз
+                if (currentFloor == waitFloor) openDoor();
+            } else if (currentFloor > waitFloor) {//движение вниз
                 currentFloor--;
                 currentAction = passenger != null ? LiftAction.MOVE_TO_FLOOR_WITH_PASSANGER : LiftAction.MOVE_TO_FLOOR_WHEN_EMPTY;
                 lastStateMessage = String.format("%s переместился вниз на %d этаж", getLiftTextPrefix(), currentFloor);
                 log.info(lastStateMessage);
-
+                if (currentFloor == waitFloor) openDoor();
             }
             //     return;
         }
     }
 
     private String getLiftTextPrefix() {
-        return passenger != null ? String.format("Лифт с пассажиром %s ", passenger.getUser()) : "Пустой лифт";
+        return passenger != null ? String.format("Лифт с пассажиром %s ", passenger.getUser()) : "пустой лифт";
     }
 
     /**
@@ -164,6 +185,10 @@ public class LiftEngine {
     public synchronized void call(byte floor) {
         validateFloor(floor);
         waitFloor = floor;
+        if (waitFloor == currentFloor) {
+            openDoor();
+            return;
+        }
         lastStateMessage = String.format("Лифт вызван на %d этаж", currentFloor);
         log.info(lastStateMessage);
     }
@@ -180,7 +205,7 @@ public class LiftEngine {
      * @return
      */
     public synchronized LiftState getCurrentLiftState() {
-        return new LiftState(currentFloor, lastHoldFloor, waitFloor, passenger != null ? passenger.getUser() : null, lastStateMessage, currentAction, broken);
+        return new LiftState(currentFloor, lastHoldFloor, waitFloor, passenger != null ? passenger.getUser() : null, lastStateMessage, currentAction, broken, isOpen);
     }
 
     /**
@@ -197,6 +222,9 @@ public class LiftEngine {
         }
         if (passenger != null) {
             throw new IllegalStateException("Нельзя войти в лифт когда он уже заполнен");
+        }
+        if (!isOpen) {
+            throw new IllegalStateException("Нельзя войти в лифт когда дверь закрыта");
         }
         passenger = new Passenger(currentFloor, null, user, LocalDateTime.now(clock));
         lastStateMessage = String.format("Пассажир %s вошел в лифт", passenger.getUser());
@@ -225,6 +253,8 @@ public class LiftEngine {
         }
         passenger.setToFloor(floor);
         waitFloor = floor;
+        if (isOpen)
+            closeDoor();
         lastStateMessage = String.format("Пассажир %s в лифте нажал на копку %d", passenger.getUser(), floor);
         log.info(lastStateMessage);
     }
@@ -247,6 +277,25 @@ public class LiftEngine {
         currentAction = beforeBreakAction;
         broken = false;
         lastStateMessage = String.format("Лифтер %s починил лифт", user);
+        log.info(lastStateMessage);
+    }
+
+    public synchronized void openDoor() {
+        if (isOpen) {
+            throw new IllegalStateException("Нельзя открыть открытую дверь");
+        }
+        doorOpeningTime = LocalDateTime.now(clock);
+        isOpen = true;
+        lastStateMessage = "Дверь открыта";
+        log.info(lastStateMessage);
+    }
+
+    public synchronized void closeDoor() {
+        if (!isOpen) {
+            throw new IllegalStateException("Нельзя закрыть закрытую дверь");
+        }
+        isOpen = false;
+        lastStateMessage = "Дверь закрыта";
         log.info(lastStateMessage);
     }
 

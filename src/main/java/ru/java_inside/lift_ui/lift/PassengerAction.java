@@ -25,7 +25,7 @@ public enum PassengerAction {
             if (liftState.user != null) {//нельзя вызвать лифт, если в нем уже есть пассажир
                 return false;
             }
-            if (liftState.currentFloor == userFloor) {//нельзя вызвать лифт, если пассажир находится с лифтом на одном этаже
+            if (liftState.currentFloor == userFloor && liftState.isOpen) {//нельзя открыть лифт, если открыт
                 return false;
             }
             return true;
@@ -39,6 +39,9 @@ public enum PassengerAction {
         @Override
         public boolean isActionAvailable(User user, byte userFloor, LiftState liftState) {
             if (userFloor <= 0) {//запрещены отрицательные этажи
+                return false;
+            }
+            if (!liftState.isOpen) {//нельзя войти в лифт, если дверь закрыта
                 return false;
             }
             if (liftState.user != null) {//нельзя войти в лифт, если в нем уже есть пассажир
@@ -97,6 +100,8 @@ public enum PassengerAction {
         }
 
     };
+
+    private PassengerAction() {}
 
     /**
      * Дополнительные проверки текущего состояния лифта для определения
